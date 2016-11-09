@@ -1,0 +1,13 @@
+<RCC>
+  <qresource prefix="img">
+    <file>aol.png</file>
+    <file>bing.png</file>
+    <file>close.png</file>
+    <file>duckduckgo.png</file>
+    <file>file.png</file>
+    <file>folder.png</file>
+    <file>yahoo.png</file>
+	<file>app.png</file>
+	<file>delete.png</file>
+  </qresource>
+</RCC>
