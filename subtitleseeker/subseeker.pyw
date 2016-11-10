@@ -16,8 +16,6 @@ class Window(QtWidgets.QMainWindow):
         self.__setup()
         self.__menu()
         self.__layout()
-        # TEMP
-        self.__import("C:\\Users\\Maikel\\Documents\\Subtitle Dir")
         self.setWindowTitle('SubtitleSeeker')
         self.setWindowIcon(util.icon('app.png'))
         self.resize(800, 600)
