@@ -8,3 +8,4 @@ SEARCH_ENGINES = (
 GOOGLE_SEARCH = "https://www.google.be/search?hl=en&num=10&start=0&q="
 
 OPENSUBTITLES = 'www.opensubtitles.org/en/'
+

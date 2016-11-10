@@ -21,13 +21,13 @@ class TableViewAdapter(QtCore.QAbstractTableModel):
             return QtCore.QVariant()
 
         if role == QtCore.Qt.ForegroundRole:
-            if index.column() == 1 and self.data_set[index.row()].value_changed():
+            if index.column() == 1 and self.data_set[index.row()].search_changed():
                 return MARK
         elif role == QtCore.Qt.DecorationRole:
             if index.column() == 0:
                 return self.data_set[index.row()].icon
         elif role == QtCore.Qt.EditRole or role == QtCore.Qt.DisplayRole:
-            return self.data_set[index.row()].value(index.column())
+            return self.data_set[index.row()].text(index.column())
 
         return QtCore.QVariant()
 
@@ -53,10 +53,15 @@ class TableViewAdapter(QtCore.QAbstractTableModel):
     # endregion
 
     # region Update
-    def set_clean(self, clean):
+    def update_clean(self, clean):
         self.layoutAboutToBeChanged.emit()
         for model in self.data_set:
             model.clean = clean
+        self.layoutChanged.emit()
+
+    def update_item_state(self, item, state):
+        self.layoutAboutToBeChanged.emit()
+        item.state = state
         self.layoutChanged.emit()
     # endregion
 

@@ -1,18 +1,16 @@
-import logging
 import sys
 import urllib.parse
 import webbrowser
-from time import time
 from queue import Queue
+from time import time
 from PyQt5 import QtWidgets, QtGui, QtCore
 from subtitleseeker import resources, util, view, constant, model, adapter, dialog, thread
 
-logging.basicConfig(level=logging.DEBUG,
-                    format='(%(threadName)-10s) %(message)s',
-                    )
-
-# region UI
 class Window(QtWidgets.QMainWindow):
+    q = Queue()
+    threads = [thread.DownloadThread() for _ in range(10)]
+
+    # region UI
     def __init__(self):
         super().__init__()
         self.__setup()
@@ -26,7 +24,12 @@ class Window(QtWidgets.QMainWindow):
 
     # region Setup
     def __setup(self):
+        self.__is_running = False
         self.__models = list()
+        self.__fails = list()
+        self.__tasks = 0
+        self.__model_count = 0
+        self.__start_time = 0
         self.__adapter = None
 
     def __menu(self):
@@ -66,6 +69,7 @@ class Window(QtWidgets.QMainWindow):
         # Progress Bar
         self.__progress_bar = QtWidgets.QProgressBar(parent)
         self.__progress_bar.setAlignment(QtCore.Qt.AlignCenter)
+        self.__progress_bar.setValue(0)
 
         # Options Box
         options_box = QtWidgets.QGroupBox(parent)
@@ -90,7 +94,7 @@ class Window(QtWidgets.QMainWindow):
         options_box_layout.addWidget(self.__combo_box)
 
         # Download Layout
-        action_layout = QtWidgets.QHBoxLayout()  # NOTE: Has NO parent, we add it manually
+        action_layout = QtWidgets.QHBoxLayout()  # Has NO parent, we add it manually
         action_layout.addSpacerItem(QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding))
 
         self.__automatic_radio = QtWidgets.QRadioButton('Automatic', self)
@@ -113,69 +117,103 @@ class Window(QtWidgets.QMainWindow):
         root_layout.addWidget(self.__progress_bar)
         root_layout.addWidget(options_box)
         root_layout.addLayout(action_layout)
+
     # endregion
 
     # region Handlers and Callbacks
     def __handle_clean_checkbox_state_change(self, state):
         if self.__adapter:
-            self.__adapter.set_clean(state == QtCore.Qt.Checked)
+            self.__adapter.update_clean(state == QtCore.Qt.Checked)
 
     def __handle_download_button_click(self):
-        if self.__models:
-            self.__progress = 0
-            self.__progress_bar.setValue(0)
-            is_auto = self.__automatic_radio.isChecked()
-            has_fallback = self.__browser_checkbox.isChecked()
-            search_engine = str(self.__combo_box.currentData())
-            #self.__status_bar.showMessage('Downloading...')
-            run_ui(self.__models, is_auto, search_engine, has_fallback)
+        if not self.__is_running and self.__models:
+            self.__check_run_fails()
+            self.__start_download(self.__models)
+
+    def __handle_item_state_change(self, item, state, progress_inc):
+        self.__adapter.update_item_state(item, state)
+        # Each item has a total of 4 increments to deliver to the progressbar, one for each state
+        # (ref. DownloadThread.__process)
+        self.__progress_bar.setValue(self.__progress_bar.value() + progress_inc)
+        if state not in (4, 5):
+            self.q.put(item)
+        else:
+            self.__finish_download()
+
     # endregion
 
     # region Helpers
     def __import(self, dir_):
-        if dir_:
+        if not self.__is_running and dir_:
             files = util.filter_media(dir_)
             if files:
-                self.__models = [model.SubtitleSearch(f) for f in files]
-                self.__adapter = adapter.TableViewAdapter(self.__models, ['File', 'Search', 'State'])
-                self.__table_view.setModel(self.__adapter)
-                self.__table_view.horizontalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
+                self.__set_content([model.SubtitleSearchModel(f) for f in files])
             else:
                 dialog.alert(self, "Media Not Found", "No media files were found ...")
+
+    def __set_content(self, models):
+        self.__models = models
+        self.__adapter = adapter.TableViewAdapter(self.__models, ['File', 'Search', 'State'])
+        self.__table_view.setModel(self.__adapter)
+        self.__table_view.horizontalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
+        self.__tasks = len(self.__models)
+        # Multiplier is 4 because each state (4) needs to be reflected in the progress
+        # (ref. Window.__handle_item_state_change)
+        self.__progress_bar.setRange(0, len(self.__models) * 4)
+        self.__progress_bar.setValue(0)
+        self.__status_bar.showMessage('')
+
+    def __check_run_fails(self):
+        fails = [m for m in self.__models if m.state == 5]
+        if fails:
+            for f in fails:
+                f.state = 0
+            self.__set_content(fails)
+    # endregion
+    # endregion
+
+    # region Script
+    def __start_download(self, models):
+        if self.__automatic_radio.isChecked():
+            self.__auto_download(models)
+        else:
+            self.__manual_download(models)
+
+    def __finish_download(self):
+        self.__tasks -= 1
+        print(self.__tasks)
+        if self.__tasks == 0:
+            self.__is_running = False
+            self.__status_bar.showMessage('Done in {:.2f}s'.format(time() - self.__start_time))
+            if self.__browser_checkbox.isChecked():
+                fails = [m for m in self.__models if m.state == 5]
+                if fails:
+                    self.__manual_download(fails)
+
+    def __auto_download(self, models):
+        if not self.__is_running:
+            self.__start_time = time()
+            self.__is_running = True
+
+            engine_url = str(self.__combo_box.currentData())
+            for t in self.threads:
+                t.engine_url = engine_url
+                if not t.isRunning():
+                    t.q = self.q
+                    t.state_changed.connect(self.__handle_item_state_change)
+                    t.daemon = True
+                    t.start()
+
+            for m in models:
+                self.q.put(m)
+
+    def __manual_download(self, models):
+        for item in models:
+            url = constant.GOOGLE_SEARCH + urllib.parse.quote(item.search)
+            webbrowser.open(url)
+
     # endregion
     pass
-# endregion
-
-
-# region Backend
-def run_ui(model_items, auto, search_engine, fallback):
-    if model_items:
-        if auto:
-            __auto_download(model_items, search_engine, fallback)
-        else:
-            __manual_download(model_items)
-
-
-def __auto_download(model_items, search_engine, fallback):
-    logging.debug('Before thread loop')
-    for i in range(5):
-        t = thread.DownloadThread()
-        t.start()
-    logging.debug('After thread loop')
-
-
-def __manual_download(model_items):
-    for item in model_items:
-        url = constant.GOOGLE_SEARCH + urllib.parse.quote(item.search)
-        webbrowser.open(url)
-
-
-def finish(total_time, fallback):
-    print('({:.2f} s)'.format(total_time))
-    if fallback:
-        print("Fallback")
-# endregion
-
 
 # region Exception Hook
 sys._excepthook = sys.excepthook
