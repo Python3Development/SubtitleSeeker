@@ -6,11 +6,11 @@ from time import time
 from PyQt5 import QtWidgets, QtGui, QtCore
 from subtitleseeker import resources, util, view, constant, model, adapter, dialog, thread
 
+
 class Window(QtWidgets.QMainWindow):
     q = Queue()
     threads = [thread.DownloadThread() for _ in range(10)]
 
-    # region UI
     def __init__(self):
         super().__init__()
         self.__setup()
@@ -118,7 +118,7 @@ class Window(QtWidgets.QMainWindow):
 
     # endregion
 
-    # region Handlers and Callbacks
+    # region Handlers
     def __handle_clean_checkbox_state_change(self, state):
         if self.__adapter:
             self.__adapter.update_clean(state == QtCore.Qt.Checked)
@@ -126,7 +126,7 @@ class Window(QtWidgets.QMainWindow):
     def __handle_download_button_click(self):
         if not self.__is_running and self.__models:
             self.__check_run_fails()
-            self.__start_download(self.__models)
+            self.__execute(self.__models)
 
     def __handle_item_state_change(self, item, state, progress_inc):
         self.__adapter.update_item_state(item, state)
@@ -137,10 +137,9 @@ class Window(QtWidgets.QMainWindow):
             self.q.put(item)
         else:
             self.__finish_download()
-
     # endregion
 
-    # region Helpers
+    # region Methods
     def __import(self, dir_):
         if not self.__is_running and dir_:
             files = util.filter_media(dir_)
@@ -160,7 +159,9 @@ class Window(QtWidgets.QMainWindow):
         self.__progress_bar.setRange(0, len(self.__models) * 4)
         self.__progress_bar.setValue(0)
         self.__status_bar.showMessage('')
+    # endregion
 
+    # region Helpers
     def __check_run_fails(self):
         fails = [m for m in self.__models if m.state == 5]
         if fails:
@@ -168,10 +169,9 @@ class Window(QtWidgets.QMainWindow):
                 f.state = 0
             self.__set_content(fails)
     # endregion
-    # endregion
 
     # region Script
-    def __start_download(self, models):
+    def __execute(self, models):
         if self.__automatic_radio.isChecked():
             self.__auto_download(models)
         else:
@@ -209,7 +209,6 @@ class Window(QtWidgets.QMainWindow):
         for item in models:
             url = constant.GOOGLE_SEARCH + urllib.parse.quote(item.search)
             webbrowser.open(url)
-
     # endregion
     pass
 
@@ -223,7 +222,6 @@ def my_exception_hook(exctype, value, traceback):
 
 sys.excepthook = my_exception_hook
 # endregion
-
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
