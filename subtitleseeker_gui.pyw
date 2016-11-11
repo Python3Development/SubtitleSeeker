@@ -126,7 +126,7 @@ class Window(QtWidgets.QMainWindow):
     def __handle_download_button_click(self):
         if not self.__is_running and self.__models:
             self.__check_run_fails()
-            self.__execute(self.__models)
+            self.__execute()
 
     def __handle_item_state_change(self, item, state, progress_inc):
         self.__adapter.update_item_state(item, state)
@@ -171,11 +171,11 @@ class Window(QtWidgets.QMainWindow):
     # endregion
 
     # region Script
-    def __execute(self, models):
+    def __execute(self):
         if self.__automatic_radio.isChecked():
-            self.__auto_download(models)
+            self.__auto_download(self.__models)
         else:
-            self.__manual_download(models)
+            self.__manual_download(self.__models)
 
     def __finish_download(self):
         self.__tasks -= 1
