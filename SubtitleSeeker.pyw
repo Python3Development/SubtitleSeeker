@@ -23,10 +23,7 @@ class Window(QtWidgets.QMainWindow):
     # region Setup
     def __setup(self):
         self.__is_running = False
-        self.__models = list()
-        self.__fails = list()
         self.__tasks = 0
-        self.__model_count = 0
         self.__start_time = 0
         self.__adapter = None
 
@@ -121,12 +118,14 @@ class Window(QtWidgets.QMainWindow):
     # region Handlers
     def __handle_clean_checkbox_state_change(self, state):
         if self.__adapter:
-            self.__adapter.update_clean(state == QtCore.Qt.Checked)
+            clean = (state == QtCore.Qt.Checked)
+            self.__adapter.update_clean(clean)
 
     def __handle_download_button_click(self):
-        if not self.__is_running and self.__models:
-            self.__check_run_fails()
-            self.__execute()
+        models = self.__table_view.model().data_set
+        if not self.__is_running and models:
+            fails = self.__check_run_fails(models)
+            self.__execute(fails or models)
 
     def __handle_item_state_change(self, item, state, progress_inc):
         self.__adapter.update_item_state(item, state)
@@ -149,33 +148,34 @@ class Window(QtWidgets.QMainWindow):
                 dialog.alert(self, "Media Not Found", "No media files were found ...")
 
     def __set_content(self, models):
-        self.__models = models
-        self.__adapter = adapter.TableViewAdapter(self.__models, ['File', 'Search', 'State'])
+        self.__adapter = adapter.TableViewAdapter(models, ['File', 'Search', 'State'])
         self.__table_view.setModel(self.__adapter)
         self.__table_view.horizontalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
-        self.__tasks = len(self.__models)
-        # Multiplier is 4 because each state (4) needs to be reflected in the progress
-        # (ref. Window.__handle_item_state_change)
-        self.__progress_bar.setRange(0, len(self.__models) * 4)
         self.__progress_bar.setValue(0)
         self.__status_bar.showMessage('')
     # endregion
 
     # region Helpers
-    def __check_run_fails(self):
-        fails = [m for m in self.__models if m.state == 5]
+    def __check_run_fails(self, models):
+        fails = [m for m in models if m.state == 5]
         if fails:
             for f in fails:
                 f.state = 0
             self.__set_content(fails)
+        return fails
     # endregion
 
     # region Script
-    def __execute(self):
+    def __execute(self, models):
+        self.__tasks = len(models)
+        # Multiplier is 4 because each state (4) needs to be reflected in the progress
+        # (ref. Window.__handle_item_state_change)
+        self.__progress_bar.setRange(0, len(models) * 4)
+
         if self.__automatic_radio.isChecked():
-            self.__auto_download(self.__models)
+            self.__auto_download(models)
         else:
-            self.__manual_download(self.__models)
+            self.__manual_download(models)
 
     def __finish_download(self):
         self.__tasks -= 1
@@ -184,7 +184,8 @@ class Window(QtWidgets.QMainWindow):
             self.__is_running = False
             self.__status_bar.showMessage('Done in {:.2f}s'.format(time() - self.__start_time))
             if self.__browser_checkbox.isChecked():
-                fails = [m for m in self.__models if m.state == 5]
+                models = self.__table_view.model().data_set
+                fails = [m for m in models if m.state == 5]
                 if fails:
                     self.__manual_download(fails)
 

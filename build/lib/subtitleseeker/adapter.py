@@ -53,10 +53,15 @@ class TableViewAdapter(QtCore.QAbstractTableModel):
     # endregion
 
     # region Update
-    def set_clean(self, clean):
+    def update_clean(self, clean):
         self.layoutAboutToBeChanged.emit()
         for model in self.data_set:
             model.clean = clean
+        self.layoutChanged.emit()
+
+    def update_item_state(self, item, state):
+        self.layoutAboutToBeChanged.emit()
+        item.state = state
         self.layoutChanged.emit()
     # endregion
 
