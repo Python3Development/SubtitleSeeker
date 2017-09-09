@@ -8,6 +8,8 @@ It's multithreaded<sup>[1](#fn1)</sup> so it can run multiple tasks at once.
 
 This project was discontinued because a better and more accurate alternative was found in Kodi. 
 
+___
+
 #### Procedure
 1. Search ~~Google~~ BING/Yahoo with _filename_.ext
 2. Browse the first **OpenSubtitles** url
