@@ -19,6 +19,5 @@ ___
 <sub>
 <a name="fn1"/>[1] This project was discontinued because a better and more accurate alternative was found in Kodi. 
 </br>
-<a name="fn2"/>[2] This was originally developed as a single thread/single files script to be used 
-as a Windows Context Menu item. It was then updated with a GUI to provide more granular control over the different steps in the downloading process.
+<a name="fn2"/>[2] This was originally developed as a single thread/single file script to be used as a Windows Context Menu item. It was then updated with a GUI to provide more granular control over the different steps in the downloading process.
 </sub>
